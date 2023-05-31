@@ -1,0 +1,133 @@
+---
+title: "Quering Data 3"
+---
+
+```{r}
+library(DBI)
+
+filename <- "../data/prod_sample.db"
+my_connection <- dbConnect(RSQLite::SQLite(),
+                           dbname=filename)
+my_connection
+```
+
+```{r}
+dbListTables(my_connection)
+```
+```{sql connection=my_connection}
+/* asterisk means all columns */
+select *
+from online_retail_history 
+limit 10 
+```
+Activity 4
+
+```{sql connection=my_connection}
+select * 
+from stock_description 
+limit 5 
+```
+```{sql connection=my_connection}
+select min(Price) as min_price, max(Price) as max_price, avg(Price) as avg_price
+from online_retail_history 
+where Country='Germany'
+```
+
+```{sql connection=my_connection}
+select distinct StockCode
+from online_retail_history 
+where Country = 'Germany'
+and Price = (select max(Price) as max_price 
+            from online_retail_history 
+            where Country = 'Germany')
+```
+```{sql connection=my_connection}
+select distinct Description
+from stock_description 
+where StockCode = (select distinct StockCode
+                   from online_retail_history 
+                   where Country = 'Germany'
+                     and Price = (select max(Price) as max_price 
+                                  from online_retail_history 
+                                  where Country = 'Germany'))
+```
+Activity 5 
+
+```{sql connection=my_connection}
+/* identify the top 10 countries with the highest averege price of item sold */
+select Country,
+      avg(Price) as avg_price 
+from online_retail_history
+group by Country 
+order by avg_price desc
+limit 10
+```
+
+```{sql connection=my_connection}
+select Country
+from online_retail_history
+group by Country 
+order by count(distinct CustomerID) desc
+limit 1
+```
+```{sql connection=my_connection}
+select Country
+from online_retail_history
+where Country <> 'United Kingdom'
+group by Country 
+order by count(distinct CustomerID) desc
+limit 1
+```
+```{sql connection=my_connection}
+select CustomerID,
+      sum(Price*Quantity) as spending
+from online_retail_history 
+group by CustomerID not null 
+order by spending desc 
+limit 1
+```
+Activity 6
+```{sql connection=my_connection}
+select t1. *,
+        t2. Description
+from online_retail_history t1
+left join stock_description t2 on t1.StockCode = t2.StockCode
+```
+
+```{sql connection=my_connection}
+/* query to identify number of stock codes with missing description*/
+
+select count(distinct t1.StockCode) as missing_descriptions 
+from online_retail_history t1
+left join stock_description t2 on t1.StockCode = t2.StockCode
+where t2.Description is null
+
+```
+```{sql connection=my_connection}
+/* query that joins two tables and gives the top 10 best selling products */
+
+select t2.Description as bestsellers 
+from stock_description t2
+left join online_retail_history t1 on t2.StockCode = t1.StockCode
+where t2.Description <> '?'
+group by t2.StockCode
+order by sum (t1.quantity) desc
+limit 10 
+```
+```{sql connection=my_connection}
+/* not working */
+select case cast(strftime('%w',InvoiceDate) as integer)
+            when 0 then 'Sunday'
+            when 1 then 'Monday'
+            when 2 then 'Tuesday'
+            when 3 then 'Wednesday'
+            when 4 then 'Thursday'
+            when 5 then 'Friday'
+            else "Saturday" end as weekday,
+from online_retail_history 
+```
+```{r}
+#disconnect from a database
+dbDisconnect(my_connection)
+```
+

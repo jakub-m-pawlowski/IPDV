@@ -1,0 +1,95 @@
+---
+title: "Using SQL to Query Data"
+---
+
+
+```{r}
+#installing necessary packages
+install.packages("DBI")
+install.packages("RSQLite")
+
+```
+
+
+```{r}
+#connecting to a database that is stored in the data folder
+library(DBI)
+
+filename <- "../data/prod_sample.db"
+
+my_connection <- dbConnect(RSQLite::SQLite(),
+                           dbname = filename)
+my_connection
+```
+
+```{r}
+#check what tables exist in this database
+dbListTables(my_connection)
+#there are two tables: "online_retail_history" & "stock_description"    
+```
+```{sql connection=my_connection}
+/* view the first ten rows of the online_retail_history table - be sure to pass in the connection 
+you can only put one query in one chunk*/
+
+select * 
+from online_retail_history
+limit 10 
+```
+
+```{sql connection=my_connection}
+/* write a sql query to view the first five rows of the stock_description table*/
+select *
+from stock_description
+limit 5
+```
+
+```{sql connection=my_connection}
+/* count how many rows the online_retail_history table contains */
+select count(*) as number_rows 
+from online_retail_history
+```
+
+```{sql connection=my_connection}
+/* count the number of rows of the stock_description table*/
+select count(*) as number_rows 
+from stock_description
+```
+```{sql connection=my_connection}
+/*calculate the total number of items sold*/
+select sum(quantity) as total_quantity
+from online_retail_history
+
+
+```
+
+```{sql connection=my_connection}
+/*calculate the average price of products sold*/
+
+select avg(Price) as avg_price
+from online_retail_history
+
+
+```
+
+```{sql connection=my_connection}
+/*calculate the min price of products sold*/
+select MIN(Price) as min_price
+from online_retail_history
+
+
+```
+
+
+```{sql connection=my_connection}
+/*calculate the min price of products sold*/
+select MAX(Price) as max_price
+from online_retail_history
+
+
+```
+```{r}
+#disconnect from a database
+dbDisconnect(my_connection)
+```
+
+

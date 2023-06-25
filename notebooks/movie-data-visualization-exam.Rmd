@@ -1,0 +1,540 @@
+---
+title: "Exam Assignment"
+authors: Liudmyla Tsybulska, Anaïs Ngo Tchang, Eleonora Ballabani, Klara Nicke, Jakub Pawlowski  
+course: Introduction to Programming 
+university: Berlin International University of Applied Sciences 
+mentoring: Sarah Haq
+---
+
+```{r}
+#connecting to our database
+
+library(DBI)
+
+filename <- "../data/exam_database.db"
+my_connection <- dbConnect(RSQLite::SQLite(),
+                           dbname = filename)
+my_connection
+```
+```{r}
+# checking which tables exist in the database 
+dbListTables(my_connection)
+```
+
+
+```{r}
+#we have three tables that exists in our database
+```
+```{sql connection=my_connection}
+/* finding the first 10 rows of the films table to find out what the column names are*/
+select *
+from films 
+limit 10 
+```
+
+```{sql connection=my_connection}
+/* finding the first 10 rows of the imdb_scores table to find out what the column names are*/
+select *
+from imdb_scores
+limit 10 
+```
+
+```{sql connection=my_connection}
+/* finding the first 10 rows of the rotten_tomatoes_scores table to find out what the column names are*/
+select *
+from rotten_tomatoes_scores
+limit 10 
+```
+```{r}
+#we have found out that the three tables have in common the variable film_id
+```
+
+```{sql connection=my_connection}
+/* we connect the tables at film_id to determine what variables are we going to use */ 
+select t1.*,
+        t2.score, t2.likes,
+          t3.audience_score, t3. critic_score
+from films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+```
+```{sql connection=my_connection}
+/* we can see imediately that many rows are missing the likes variable, so we're going to see how many exactly  */ 
+SELECT COUNT(*) AS missing_likes_count
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+WHERE t2.likes IS NULL
+
+/*we can determine, that there are many entries with missing "likes" value, so we are going to exclude it from the research to ensure integrity*/
+```
+```{sql connection=my_connection}
+/* ensuring that there is no data from before 1970*/
+SELECT t1.release_year as earlier_than_1970
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+WHERE t1.release_year < 1970
+```
+
+```{sql connection=my_connection}
+/* ensuring that there is no data from after 2017*/
+SELECT t1.release_year as earlier_than_1970
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+WHERE t1.release_year > 2017
+```
+
+```{sql connection=my_connection}
+/* we are combining the imdb score and rotten tomatoes' audience and critic scores to create an ultimate score for each data entry */
+SELECT t1.film_id, t1.film_name,
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+```
+
+```{sql connection=my_connection}
+/* top 10 films by ultimate score */
+SELECT t1.film_id, t1.film_name as Top_10_Best,
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+ORDER BY ultimate_score DESC
+LIMIT 10
+```
+```{sql connection=my_connection}
+/* we're assigning a position number on our ranking to each film; source: Chat GPT*/
+SELECT t1.film_name as Top_10_Best,
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score,
+       ROW_NUMBER() OVER (ORDER BY (t2.score + t3.audience_score + t3.critic_score) DESC) AS position
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+ORDER BY ultimate_score DESC
+LIMIT 10
+
+/* Our top movies are Schindler's List and The Shawshank Redemption, both scoring 94 points! */
+```
+```{sql connection=my_connection}
+/* let's find the 10 worst rated movies and their positions; source: Chat GPT*/
+SELECT t1.film_name as Top_10_Worst_Films,
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score,
+       ROW_NUMBER() OVER (ORDER BY (t2.score + t3.audience_score + t3.critic_score) DESC) AS position
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+ORDER BY ultimate_score ASC
+LIMIT 10
+```
+```{sql connection=my_connection}
+/* let's find top 10 comedies */
+SELECT t1.film_name as Top_10_Comedies, 
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+WHERE t1.[genre(s)] LIKE '%Comedy%'
+ORDER BY ultimate_score DESC
+LIMIT 10
+```
+```{sql connection=my_connection}
+/* let's find top 10 dramas */
+SELECT t1.film_name as Top_10_Dramas, 
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+WHERE t1.[genre(s)] LIKE '%Drama%'
+ORDER BY ultimate_score DESC
+LIMIT 10
+```
+```{sql connection=my_connection}
+/* let's find top 10 romances */
+SELECT t1.film_name as Top_10_Romances, 
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+WHERE t1.[genre(s)] LIKE '%Romance%'
+ORDER BY ultimate_score DESC
+LIMIT 10
+```
+```{sql connection=my_connection}
+/* let's find top 10 adventures */
+SELECT t1.film_name as Top_10_Adventures, 
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+WHERE t1.[genre(s)] LIKE '%Adventure%'
+ORDER BY ultimate_score DESC
+LIMIT 10
+```
+
+```{sql connection=my_connection}
+/* let's find top 10 horrors */
+SELECT t1.film_name as Top_10_Horrors, 
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+WHERE t1.[genre(s)] LIKE '%Horror%'
+ORDER BY ultimate_score DESC
+LIMIT 10
+```
+
+```{sql connection=my_connection}
+/*let's find the genre that has the highest scoring films*/
+SELECT genre, AVG(ultimate_score) AS average_ultimate_score
+FROM (
+  SELECT t1.film_id, t1.`genre(s)` AS genre, (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score
+  FROM films t1
+  INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+  INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+) subquery
+GROUP BY genre
+ORDER BY average_ultimate_score DESC
+LIMIT 1;
+```
+```{sql connection=my_connection}
+/*let's find the genre that has the lowest scoring films; source for the subquery: we3resource.com*/ 
+SELECT genre, AVG(ultimate_score) AS average_ultimate_score
+FROM (
+  SELECT t1.film_id, t1.`genre(s)` AS genre, (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score
+  FROM films t1
+  INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+  INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+) subquery
+GROUP BY genre
+ORDER BY average_ultimate_score ASC
+LIMIT 1;
+```
+```{r}
+library(tidyverse)
+library(ggplot2)
+
+#sql query with top 10 movies and their ultimate scores
+top_10_movies <- paste("
+SELECT t1.film_name,
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+ORDER BY ultimate_score DESC
+LIMIT 10",
+sep = "")
+
+#storing the connection and the query as a variable
+top_10_movies <- tbl(my_connection, sql(top_10_movies))
+top_10_movies
+
+
+```
+
+```{r}
+#creating a scatter plot that shows how the ultimate scores of the top 10 movies compare to each other; source for graph customization: sthda.com 
+ggplot(top_10_movies, aes(x = reorder(film_name, ultimate_score), y = ultimate_score)) +
+  geom_point(color = "#00BFC4", size = 3) +
+  xlab('Film') +
+  ylab('Ultimate Score') +
+  ggtitle("Top 10 Films by Ultimate Score") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+```{r}
+library(DBI)
+library(ggplot2)
+
+#sql query with top 10 worst movies and their ultimate scores
+top_10_worst <- paste("
+SELECT t1.film_name,
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score,
+       ROW_NUMBER() OVER (ORDER BY (t2.score + t3.audience_score + t3.critic_score) DESC) AS position
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+ORDER BY ultimate_score ASC
+LIMIT 10",
+sep = "")
+
+#assignint the connection and query to a variable
+top_10_worst <- tbl(my_connection, sql(top_10_worst))
+top_10_worst
+```
+```{r}
+#plotting the top 10 worst movies as a scatterplot 
+library(dplyr)
+library(ggplot2)
+
+films <- top_10_worst %>%
+  arrange(ultimate_score) %>%
+  head(10)
+
+
+ggplot(films, aes(x = reorder(film_name, ultimate_score), y = ultimate_score)) +
+  geom_point(color = "#F35E5A") +
+  labs(x = "Film", y = "Ultimate Score") +
+  ggtitle("Worst 10 Films by Ultimate Score") +
+  theme(axis.text.x = element_text(size = 8, angle = 45, hjust = 1))
+```
+
+```{r}
+#plotting a chart comparing the ultimate scores of the best and the worst movie; small help for feedback from Chat GPT
+library(dplyr)
+library(ggplot2)
+
+# Best movie query
+best_movie <- "
+SELECT t1.film_name,
+       t2.score,
+       t3.audience_score,
+       t3.critic_score,
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+ORDER BY ultimate_score DESC
+LIMIT 1"
+
+# Worst movie query
+worst_movie <- "
+SELECT t1.film_name,
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score,
+       ROW_NUMBER() OVER (ORDER BY (t2.score + t3.audience_score + t3.critic_score) DESC) AS position
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+ORDER BY ultimate_score ASC
+LIMIT 1"
+
+
+best_movie_data <- dbGetQuery(my_connection, best_movie)
+worst_movie_data <- dbGetQuery(my_connection, worst_movie)
+
+
+comparison_data <- data.frame(Position = c("Best Movie", "Worst Movie"),
+                              Ultimate_Score = c(best_movie_data$ultimate_score, worst_movie_data$ultimate_score))
+
+
+ggplot(comparison_data, aes(x = Position, y = Ultimate_Score, fill = Position)) +
+  geom_bar(stat = "identity", color = "black") +
+  geom_text(aes(label = Ultimate_Score), vjust = -0.5, color = "white", size = 4) +
+  labs(x = NULL, y = "Ultimate Score") +
+  ggtitle("Comparison: Best vs Worst Movie") +
+  theme_minimal() +
+   scale_fill_manual(values = c("Best Movie" = "#6BA204", "Worst Movie" = "#F35E5A"))
+```
+
+
+```{r}
+#now we are going to plot a bar chart which compares the different scores with the ultimate score for the film with the highest ultimate score
+
+result <- dbGetQuery(my_connection, best_movie)
+
+data <- data.frame(Metric = c("Ultimate Score", "IMDB Score", "RT Audience Score", "RT Critic Score"),
+                   Value = c(result$ultimate_score, result$score, result$audience_score, result$critic_score))
+
+ggplot(data, aes(x = Metric, y = Value, fill = Metric)) +
+  geom_bar(stat = "identity", color = "black") +
+  geom_text(aes(label = round(Value, 2)), vjust = -0.5, size = 3) +   
+  labs(x = NULL, y = "Score") +
+  ggtitle(paste("Comparison of Scores for The Best Film:", result$film_name)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 7))
+```
+
+
+
+```{r}
+#now we're doing the same for the best film in the Drama genre 
+best_drama <- "
+SELECT t1.film_name,
+       t2.score,
+       t3.audience_score,
+       t3.critic_score,
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+WHERE t1.[genre(s)] LIKE '%Drama%'
+ORDER BY ultimate_score DESC
+LIMIT 1"
+
+
+result <- dbGetQuery(my_connection, best_drama)
+
+data <- data.frame(Metric = c("Ultimate Score", "IMDB Score", "RT Audience Score", "RT Critic Score"),
+                   Value = c(result$ultimate_score, result$score, result$audience_score, result$critic_score))
+
+ggplot(data, aes(x = Metric, y = Value, fill = Metric)) +
+  geom_bar(stat = "identity", color = "black") +
+  geom_text(aes(label = round(Value, 2)), vjust = -0.5, size = 3) +   
+  labs(x = NULL, y = "Score") +
+  ggtitle(paste("Comparison of Scores for The Best Drama Film:", result$film_name)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 7))
+```
+```{r}
+#now we're doing the same for the best film the romance genre 
+best_romance <- "
+SELECT t1.film_name,
+       t2.score,
+       t3.audience_score,
+       t3.critic_score,
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+WHERE t1.[genre(s)] LIKE '%Romance%'
+ORDER BY ultimate_score DESC
+LIMIT 1"
+
+
+result <- dbGetQuery(my_connection, best_romance)
+
+data <- data.frame(Metric = c("Ultimate Score", "IMDB Score", "RT Audience Score", "RT Critic Score"),
+                   Value = c(result$ultimate_score, result$score, result$audience_score, result$critic_score))
+
+ggplot(data, aes(x = Metric, y = Value, fill = Metric)) +
+  geom_bar(stat = "identity", color = "black") +
+  geom_text(aes(label = round(Value, 2)), vjust = -0.5, size = 3) +   
+  labs(x = NULL, y = "Score") +
+  ggtitle(paste("Comparison of Scores for The Best Romance:", result$film_name)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 7))
+```
+```{r}
+#now we're doing the same for the best film the Comedy genre 
+best_comedy <- "
+SELECT t1.film_name,
+       t2.score,
+       t3.audience_score,
+       t3.critic_score,
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+WHERE t1.[genre(s)] LIKE '%Comedy%'
+ORDER BY ultimate_score DESC
+LIMIT 1"
+
+
+result <- dbGetQuery(my_connection, best_comedy)
+
+data <- data.frame(Metric = c("Ultimate Score", "IMDB Score", "RT Audience Score", "RT Critic Score"),
+                   Value = c(result$ultimate_score, result$score, result$audience_score, result$critic_score))
+
+ggplot(data, aes(x = Metric, y = Value, fill = Metric)) +
+  geom_bar(stat = "identity", color = "black") +
+  geom_text(aes(label = round(Value, 2)), vjust = -0.5, size = 3) +   
+  labs(x = NULL, y = "Score") +
+  ggtitle(paste("Comparison of Scores for The Best Comedy:", result$film_name)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 7))
+
+```
+```{r}
+#now we're doing the same for the best film the Horror genre 
+best_horror <- "
+SELECT t1.film_name,
+       t2.score,
+       t3.audience_score,
+       t3.critic_score,
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+WHERE t1.[genre(s)] LIKE '%Horror%'
+ORDER BY ultimate_score DESC
+LIMIT 1"
+
+
+result <- dbGetQuery(my_connection, best_horror)
+
+
+data <- data.frame(Metric = c("Ultimate Score", "IMDB Score", "RT Audience Score", "RT Critic Score"),
+                   Value = c(result$ultimate_score, result$score, result$audience_score, result$critic_score))
+
+ggplot(data, aes(x = Metric, y = Value, fill = Metric)) +
+  geom_bar(stat = "identity", color = "black") +
+  geom_text(aes(label = round(Value, 2)), vjust = -0.5, size = 3) +   
+  labs(x = NULL, y = "Score") +
+  ggtitle(paste("Comparison of Scores for The Best Horror Film:", result$film_name)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 7))
+
+```
+
+
+```{r}
+#now we're doing the same for the best film the Adventure genre 
+
+best_adventure <- "
+SELECT t1.film_name,
+       t2.score,
+       t3.audience_score,
+       t3.critic_score,
+       (t2.score + t3.audience_score + t3.critic_score) / 3 AS ultimate_score
+FROM films t1
+INNER JOIN imdb_scores t2 ON t1.film_id = t2.film_id
+INNER JOIN rotten_tomatoes_scores t3 ON t1.film_id = t3.film_id
+WHERE t1.[genre(s)] LIKE '%Adventure%'
+ORDER BY ultimate_score DESC
+LIMIT 1"
+
+
+result <- dbGetQuery(my_connection, best_adventure)
+
+
+data <- data.frame(Metric = c("Ultimate Score", "IMDB Score", "RT Audience Score", "RT Critic Score"),
+                   Value = c(result$ultimate_score, result$score, result$audience_score, result$critic_score))
+
+ggplot(data, aes(x = Metric, y = Value, fill = Metric)) +
+  geom_bar(stat = "identity", color = "black") +
+  geom_text(aes(label = round(Value, 2)), vjust = -0.5, size = 3) +   
+  labs(x = NULL, y = "Score") +
+  ggtitle(paste("Comparison of Scores for The Best Adventure Film:", result$film_name)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 7),
+        plot.title = element_text(size = 12))
+
+
+```
+```{r}
+#Now let's combine the 6 previous bar charts, for the ultimate comparison, unfortunately we have to type in the data manually; idea on how to achieve this: Chat GPT
+ultimate_comparison <- data.frame(
+  Genre = c("Best Over All", "Drama", "Romance", "Comedy", "Horror", "Adventure"),
+  Ultimate_Score = c(94, 94, 91, 91, 92, 93),
+  IMDB_Score = c(89, 89, 81, 85, 85, 86),
+  RT_Audience_Score = c(97, 97, 93, 94, 94, 96),
+  RT_Critic_Score = c(97, 97, 100, 96, 97, 97)
+)
+
+genre_order <- c("Best Over All", "Drama", "Romance", "Comedy", "Horror", "Adventure")
+
+ultimate_comparison$Genre <- factor(ultimate_comparison$Genre, levels = genre_order)
+#reshaping the data; source: Chat GPT
+library(tidyr)
+data_long <- pivot_longer(ultimate_comparison, cols = -Genre, names_to = "Legend", values_to = "Value")
+
+#replacing underscores with spaces; source Chat GPT
+data_long$Legend <- gsub("_", " ", data_long$Legend)
+
+library(ggplot2)
+ggplot(data_long, aes(x = Genre, y = Value, fill = Legend)) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  labs(x = NULL, y = "Score") +
+  ggtitle("Ultimate Comparison of Best Scoring Films by Genre") +
+  theme_minimal() +
+   theme(axis.text.x = element_text(size = 7))
+
+dbDisconnect(my_connection)
+```
+```
+
+
+
